@@ -1,0 +1,210 @@
+import re
+import copy
+
+def structure_word(name,i):
+    #Segarigating upper and lower case alphabets and space 
+    words = re.findall(r'\b[A-Za-z ]+\b', name.upper())
+    print(name)
+    print(words)
+    word = ''.join(words) #joints words 
+    print (f"Word {i+1}: {word}")
+    return word
+
+def scoring (word):
+    data = {}
+    #calling the value.txt file
+    with open ('values.txt','r') as file:
+        for line in file:
+            key, value = line.split()
+            data[key] = int(value)
+    # print (data)
+    word_scores_list = [None] * len(word)
+
+    #separating all the characters along with their index in word and storing it in "word_index"
+    word_index = [(char, index) for index, char in enumerate(word)]
+    #counting maximum index
+    max_index = max(index for _, index in word_index)
+    #scring the last element of the word if it is 'E' or not
+    if max_index >= 0:
+        word_scores_list[max_index] = 20 if word_index[max_index][0] == "E" else 5
+    #making a list of all the characters in the word from word_index
+    char = [char for char, index in word_index]
+    #Now Separating the code into two cases.
+    #First is whether the word is a single word such as "Hello" or a joint word like "Hello World"
+    if " " in char:
+        #Extracting indexes of the space
+        space_indices = [index for index, (char, _) in enumerate(word_index) if char == " "]
+        #Allocating a special number say, 999 to identify the position of a space
+        word_scores_list = list(map(lambda i: 999 if i in space_indices else word_scores_list[i], range(len(word_scores_list))))
+        #In the left side of the space there always a last letter of a word
+        #Checking for all words whether their last letter is "E" or not and scoring it respectively
+        for index in space_indices:
+            if index - 1 >= 0:
+                word_scores_list[index - 1] = 20 if word_index[index - 1][0] == "E" else 5
+        #Calculating other score based on the position
+        word_scores_list = position_score(word_scores_list, space_indices)
+        #Second part, if the word is a single word
+    else:
+        word_scores_list = position_score(word_scores_list, [0])
+    #making a duplicate of word_score_list since it only contains scores based on the positions
+    score_list = copy.copy(word_scores_list)
+
+    list_re = []
+    #running a loop to segrigate indexes of the first letter of a word
+    for i in range(len(word_scores_list)):
+        if word_scores_list[i] == 999:
+            list_re.append(i-1)
+            list_re.append(i + 1)
+        #adding 0 to the list for the first letter of first word
+        first_ele = [0] + list_re
+    #adding the predetermined score of a letter to the possition score 
+    for element, index in word_index:
+        if element in data:
+            word_scores_list[index] += data[element]
+    #selecting the first and last letter of words in name
+    for i in range(len(word_scores_list)):
+        if word_scores_list[i] == 999:
+            j = i - 1
+            q = i + 1
+        else:
+            j = max_index
+            q = max_index
+        #assigning the original score to these letters
+        word_scores_list[j] = score_list[j]
+        word_scores_list[q] = score_list[q]
+        for i in first_ele:
+            word_scores_list[i] = score_list[i]
+    return word_scores_list
+
+    
+def position_score(word_scores_list, index):
+    #making a list of posible values of the first letter of a word
+    #one list element, 0 if the word is single word or the indexes of the first letters of each individual words 
+    list_index_value = [0] + [i + 1 for i in index if i != 0]
+    #Running a loop over the first element of a word to score first three element of a word(Because it's value differ from positions)
+    for j in list_index_value:
+        i=0
+        while i<=2:
+            #Restricting loop to give score only letters with None value, means this letter hasnot been scored yet.
+            #and restring it into the range of the word
+            if j + i < len(word_scores_list) and word_scores_list[j + i] is None:
+                #To score upto three letters only
+                if j+i <= j+3:
+                    word_scores_list[j + i] = i
+            #Increase the conditionar value to terminate the loop since error in "if" condition means that the word does not have three letters.
+            else:
+                i += 2
+            #Increasing value for while loop
+            i += 1
+    
+    #Running a loop to set values for other letters
+    #Restring the loop to the length of the word
+    for i in range (len(word_scores_list)):
+        #Choosing value for the first letter of the word
+        #However, there will be None pending values only
+        #so, no need to put the conditions as we direct it in the above case.
+        for j in list_index_value:
+            if j + i < len(word_scores_list) and word_scores_list[j + i] is None:
+                word_scores_list[j + i] = 3
+    return(word_scores_list)
+
+
+def remove_repeate(abbreviations_list):
+
+    result_list = []
+    # it finds the minimum score for each abbreviation across different pairs of abbreviations and scores.
+    for abbreviations, scores in abbreviations_list:
+        min_scores_dict = {}
+        for abbreviation, score in zip(abbreviations, scores):
+            if abbreviation not in min_scores_dict or score < min_scores_dict[abbreviation]:
+                min_scores_dict[abbreviation] = score
+        result_list.append(min_scores_dict)
+
+    print("\nresult_list below")
+    print(result_list)
+
+    #Identify and remove duplicate abbreviaiton
+    for p in range(len(result_list)):
+        for abbreviation, _ in list(result_list[p].items()):
+            for i in range(p + 1, len(result_list)):
+                if abbreviation in result_list[i]:
+                    del result_list[i][abbreviation]
+                    if abbreviation in result_list[p]:
+                        del result_list[p][abbreviation]
+
+    return result_list
+
+def generate_abbreviations(name_list):
+
+    abbreviations_list = []
+    scores_list = []
+    #Generating each abbreviation within the set rules
+    #and calculating scores for each abbreviation
+    for n, name in enumerate(name_list):
+        abbreviations_n = []
+        scores_n = []
+        name1 = structure_word(name,n)
+        print(name1)
+        score_list = scoring(name1)
+        print(score_list)
+        filtered_scores = [value for value in score_list if value != 999]
+        print(filtered_scores)
+        word = ''.join(name1.split())
+        print(word)
+        for i in range(1, len(word) - 1):
+            for j in range(i, len(word) - 1):
+                abbreviation = word[0] + word[i] + word[j + 1]
+                score = filtered_scores[0] + filtered_scores[i] + filtered_scores[j+1]
+                abbreviations_n.append(abbreviation)
+                scores_n.append(score)
+        abbreviations_list.append(abbreviations_n)
+        scores_list.append(scores_n)
+    #merging abbreviations and scores
+    paired_list = list(zip(abbreviations_list, scores_list))
+    return paired_list
+
+def resultant_abb(name_list):
+
+    all_abbreviation = []
+    resultant_abbreviation = []
+    #stores all the abbreviations with their score
+    result = generate_abbreviations(name_list)
+
+    print("\n\n\nall result below")
+    print(result)
+    #removing duplicates if any
+    resultant_abbreviation = remove_repeate(result)
+    print("\nRemoval abbs")
+    print(resultant_abbreviation)
+
+    min_scores_with_keys_list = []
+    #finding abbreviaiton with the lowest score for each input
+    for item in resultant_abbreviation:
+        if item:  # Check if item is not an empty sequence
+            min_key = min(item, key=item.get)
+            min_score = item[min_key]
+            min_scores_with_keys_list.append((min_key, min_score))
+        else:
+            min_scores_with_keys_list.append(("", ""))  # Append an empty element if all the abbrevitions deletes due to duplicates
+
+    #printing desired output
+    print("\nMin Scores below")
+    print(min_scores_with_keys_list)
+    print("\nFinal Output")
+    for i in range(len(name_list)):
+        print("\n"+name_list[i])
+        print(min_scores_with_keys_list[i][0]) if i < len(min_scores_with_keys_list) else print(" ")
+
+    # #print("Abbreviation list:", resultant_abbreviation)
+
+def main():
+    input = {}
+    file_path = 'trees.txt'
+    #calling the input file trees.txt
+    with open(file_path, 'r') as file:
+        input = [line.strip() for line in file]
+    print(input)
+    resultant_abb(input)
+
+if __name__ == "__main__":
+    main()
